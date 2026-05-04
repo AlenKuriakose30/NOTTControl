@@ -252,7 +252,7 @@ class MainWindow(QMainWindow):
         roi_dimensions = roi_string.split(',')
         if len(roi_dimensions) != 4:
             raise Exception('Invalid Roi config')
-        return Roi(roi_dimensions[0], roi_dimensions[1], roi_dimensions[2], roi_dimensions[3])
+        return Roi(int(roi_dimensions[0])-config['CAMERA'].getint('window_x'), int(roi_dimensions[1])-config['CAMERA'].getint('window_y'), roi_dimensions[2], roi_dimensions[3])
     
     def load_roi_positions_from_config(self):
         self.load_roi_config(config)
