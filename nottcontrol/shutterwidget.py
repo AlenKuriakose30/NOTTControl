@@ -35,7 +35,7 @@ class ShutterWidget(QWidget):
             self.ui.label_status.setText(str(status))
             self.ui.label_state.setText(str(state))
             self.ui.label_subState.setText(str(substate))
-            hwStatus = self.get_shutter_status
+            hwStatus = self.get_shutter_status()
             self.ui.label_opened.setText(str(hwStatus))
         except Exception as e:
             print(e)
@@ -43,7 +43,7 @@ class ShutterWidget(QWidget):
     
     def load_position(self):
         try:
-            hwStatus, timestamp = self.get_shutter_status(), datetime.utcnow()
+            hwStatus = self.get_shutter_status()
             #timestamp_plc = datetime.strptime(timestamp, '%Y-%m-%d-%H:%M:%S.%f')
 
             shutter_pos = -1
@@ -51,7 +51,7 @@ class ShutterWidget(QWidget):
                 shutter_pos = 1
             if hwStatus == "Closed":
                 shutter_pos = 0
-            self.redis_client.add_shutter_position(self._shutter.name, timestamp, shutter_pos)
+            self.redis_client.add_shutter_position(self._shutter.name, datetime.utcnow(), shutter_pos)
         except Exception as e:
             print(e)
             self.ui.label_error.setText(str(e))
@@ -59,10 +59,9 @@ class ShutterWidget(QWidget):
     def get_shutter_status(self):
         if self._shutter.is_open:
             return "Open"
-        elif self._shutter.is_closed:
+        if self._shutter.is_closed:
             return "Closed"
-        else:
-            return "Moving"
+        return "Unknown"
 
     def reset(self):
         try:
