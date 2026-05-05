@@ -479,12 +479,11 @@ class MainWindow(QMainWindow):
         self.pw_roi.setMinimumWidth(self.ui.frame_roi_graph.width())
         self.pw_roi.setMinimumHeight(self.ui.frame_roi_graph.height())
         self.pw_roi.addLegend()
-        self.pw_roi.getPlotItem().setLabel(axis='left', text='ROI brightness')
+        self.pw_roi.getPlotItem().setLabel(axis='left', text='ROI brightness [ADU]')
 
-        
         self.pw_roi.show()
         self.plot_data_item_roi = self.pw_roi.plot()
-        self.pw_roi.getPlotItem().setLabel(axis='bottom', text='Time')
+        self.pw_roi.getPlotItem().setLabel(axis='bottom', text='Time [UTC]')
 
         #Now safe to start processing the frames
         threading.Thread(target=self.process_frame, daemon=True).start()
@@ -513,7 +512,7 @@ class MainWindow(QMainWindow):
 
         for roi_widget in self.roi_widgets:
             if roi_widget.isChecked():
-                self.pw_roi.plot(list(self.timestamps), list(roi_widget.max_values), name= roi_widget.name, pen= roi_widget.color)
+                self.pw_roi.plot(list(self.timestamps), list(roi_widget.avg_values), name= roi_widget.name, pen= roi_widget.color)
                 
     def process_roi(self, img, timestamp, coadded_frame):
         calculator = self.run_roi_calculator(img)
