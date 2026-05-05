@@ -512,7 +512,7 @@ class MainWindow(QMainWindow):
 
         for roi_widget in self.roi_widgets:
             if roi_widget.isChecked():
-                self.pw_roi.plot(list(self.timestamps), list(roi_widget.avg_values), name= roi_widget.name, pen= roi_widget.color)
+                self.pw_roi.plot(list(self.timestamps), list(roi_widget.max_values), name= roi_widget.name, pen= roi_widget.color)
                 
     def process_roi(self, img, timestamp, coadded_frame):
         calculator = self.run_roi_calculator(img)
