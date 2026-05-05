@@ -480,7 +480,7 @@ class MainWindow(QMainWindow):
         self.pw_roi.setMinimumHeight(self.ui.frame_roi_graph.height())
         self.pw_roi.addLegend()
         self.pw_roi.getPlotItem().setLabel(axis='left', text='ROI brightness [ADU]')
-
+        
         self.pw_roi.show()
         self.plot_data_item_roi = self.pw_roi.plot()
         self.pw_roi.getPlotItem().setLabel(axis='bottom', text='Time [UTC]')
