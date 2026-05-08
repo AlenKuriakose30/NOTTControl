@@ -379,6 +379,24 @@ class HumInt(object):
         else:
             cal_seq, cal_seq_std = frames.calib_seq_nifits_format(dark)
             return cal_seq, cal_seq_std
+        
+
+    def get_frames_cal_no_bg(self, dt, dark=None):
+        """
+        To get calibrated ROI flux with dark subtraction only. No background ROI subtraction is applied."""
+
+        if dark is None:
+            dark = self.dark
+        frames = self.get_frames(dt)
+
+        cal_mean_nbg, cal_mean_nbg_std = frames.calib_master_nifits_no_bg_format(dark)
+
+        if self.auto_display is not False:
+            self.buffer_broad.push(cal_mean_nbg[self.sc_mask, :].sum(axis=0))
+            self.buffer_disp.push(cal_mean_nbg[self.sc_mask, :].T.flatten())
+
+        return cal_mean_nbg, cal_mean_nbg_std
+    
 
     def get_frames_cal_to_np(self, dt, dark=None, sequence=False):
         cal,cal_std = self.get_frames_cal(dt, dark, sequence)
@@ -762,9 +780,9 @@ class HumInt(object):
         piston_full[-piston_probe.shape[0]:, :] = piston_probe
         test_conditions["amplitude_full"] = amplitude_full
         test_conditions["piston_full"] = piston_full
-        test_conditions["probe_series"] = probe_series
+        test_conditions["probe_series"] = probe_series 
 
-        if dt is None:
+        if dt is None: 
             test_sample = self.sample_long_cal(1.0)
             rms = np.std(test_sample, axis=0)
 
