@@ -305,6 +305,27 @@ class Frame(object):
             cal_mean_std = np.hypot(sci_mean_std, dark_mean_std)
     
         return cal_mean, cal_mean_std
+    
+
+    def calib_master_no_bg(self, dark, flat=None, dark_mean=None, dark_mean_std=None):
+        """
+        Compute calibrated ROI master frame with dark subtraction only.
+        No background ROI subtraction is applied.
+        """
+
+        # Mean dark frame and corresponding std frame
+        if dark_mean is None or dark_mean_std is None:
+            dark_mean, dark_mean_std = dark.master_rois
+
+        # Mean science ROI frames
+        sci_mean, sci_mean_std = self.master_rois
+
+        # Dark subtraction only
+        cal_mean = sci_mean - dark_mean
+        cal_mean_std = np.hypot(sci_mean_std, dark_mean_std)
+
+        return cal_mean, cal_mean_std
+    
 
     def calib_seq_nifits_format(self, dark, flat=None):
         cal_seq, cal_seq_std = self.calib_seq(dark, flat=flat)
@@ -314,6 +335,11 @@ class Frame(object):
         cal_mean, cal_mean_std = self.calib_master(dark, flat=flat)
         return cal_mean.sum(axis=-1).transpose((1,0)), cal_mean_std.sum(axis=-1).transpose((1,0))
 
+    def calib_master_nifits_no_bg_format(self, dark, flat=None):
+        cal_mean, cal_mean_std = self.calib_master_no_bg(dark, flat=flat)
+        return (cal_mean.sum(axis=-1).transpose((1, 0)), cal_mean_std.sum(axis=-1).transpose((1, 0)))
+        
+    
     def calib(self, dark, flat=None, full=False):
         # Function that combines above two into one.
         if not full:
