@@ -306,26 +306,31 @@ class Frame(object):
     
         return cal_mean, cal_mean_std
     
-
-    def calib_master_no_bg(self, dark, flat=None, dark_mean=None, dark_mean_std=None):
+    def bg_master_nifits_format(self, dark, dark_mean=None, dark_mean_std=None):
         """
-        Compute calibrated ROI master frame with dark subtraction only.
-        No background ROI subtraction is applied.
+        Return the mean dark subtracted background that is subtracted
+        from each ROI in calib_master()
         """
 
-        # Mean dark frame and corresponding std frame
         if dark_mean is None or dark_mean_std is None:
             dark_mean, dark_mean_std = dark.master_rois
 
-        # Mean science ROI frames
         sci_mean, sci_mean_std = self.master_rois
 
-        # Dark subtraction only
+        # Dark subtraction
         cal_mean = sci_mean - dark_mean
         cal_mean_std = np.hypot(sci_mean_std, dark_mean_std)
 
-        return cal_mean, cal_mean_std
-    
+        # Average dark subtracted background from background ROIs
+        N = len(self.bg_roi_idx)
+        bg_mean = np.average(cal_mean[self.bg_roi_idx], axis=0)
+        bg_mean_std = np.linalg.norm(cal_mean_std[self.bg_roi_idx], axis=0) / N
+
+        # Converting to same format used by calib_master_nifits_format
+        bg_mean = bg_mean.sum(axis=-1)
+
+        return bg_mean
+
 
     def calib_seq_nifits_format(self, dark, flat=None):
         cal_seq, cal_seq_std = self.calib_seq(dark, flat=flat)
