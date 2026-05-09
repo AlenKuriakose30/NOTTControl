@@ -364,7 +364,7 @@ class HumInt(object):
             self.shutter_set(shutter_state_pre, wait=True, verbose=verbose)
             return frames
     
-    def get_frames_cal(self, dt, dark=None, sequence=False):
+    def get_frames_cal(self, dt, dark=None, sequence=False, return_bg=False):
         if dark is None:
             if verbose:
                 print("Using the default dark")
@@ -372,31 +372,21 @@ class HumInt(object):
         frames = self.get_frames(dt)
         if not sequence:
             cal_mean, cal_mean_std = frames.calib_master_nifits_format(dark)
+            
+            if return_bg:
+                bg_mean = frames.bg_master_nifits_format(dark) #to get bacground (that was subtracted from flux)
+
             if self.auto_display is not False:
                 self.buffer_broad.push(cal_mean[self.sc_mask,:].sum(axis=0))
                 self.buffer_disp.push(cal_mean[self.sc_mask,:].T.flatten())
+            if return_bg:
+                return cal_mean, cal_mean_std, bg_mean
+
             return cal_mean, cal_mean_std
         else:
             cal_seq, cal_seq_std = frames.calib_seq_nifits_format(dark)
             return cal_seq, cal_seq_std
         
-
-    def get_frames_cal_no_bg(self, dt, dark=None):
-        """
-        To get calibrated ROI flux with dark subtraction only. No background ROI subtraction is applied."""
-
-        if dark is None:
-            dark = self.dark
-        frames = self.get_frames(dt)
-
-        cal_mean_nbg, cal_mean_nbg_std = frames.calib_master_nifits_no_bg_format(dark)
-
-        if self.auto_display is not False:
-            self.buffer_broad.push(cal_mean_nbg[self.sc_mask, :].sum(axis=0))
-            self.buffer_disp.push(cal_mean_nbg[self.sc_mask, :].T.flatten())
-
-        return cal_mean_nbg, cal_mean_nbg_std
-    
 
     def get_frames_cal_to_np(self, dt, dark=None, sequence=False):
         cal,cal_std = self.get_frames_cal(dt, dark, sequence)
@@ -606,17 +596,26 @@ class HumInt(object):
 
         kappa = []
         std_kappa = []
+
+        kappa_bg_mean = []
+
         for beam in shutter_probe:
             shutter_state = np.abs(beam).astype(bool)
             self.shutter_set(shutter_state)
-            a, a_std = self.get_frames_cal(dt)
+            a, a_std, bg_mean = self.get_frames_cal(dt, return_bg=True)
             kappa.append(a)
+            kappa_bg_mean.append(bg_mean)
+
             if dt is not None:
                 std_kappa.append(a_std)
             else:
                 std_kappa.append(rms)
+
         kappa = np.array(kappa)
         std_kappa = np.array(std_kappa)
+
+        kappa_bg_mean = np.array(kappa_bg_mean)   #(5,wl), not ROI, but the subtracted backgrounds from flux measurements
+        kappa_bg_diff = kappa_bg_mean[1:] - kappa_bg_mean[0] #(4, wl)
     
         sleep(2.0)
     
@@ -625,18 +624,46 @@ class HumInt(object):
         # (5, 106, 10)
         # (frame, wl, output)
         n_wl = kappa.shape[1]
+
+        kappa_0 = np.copy(kappa[0])  # saving the all shutters closed background state
+
         kappa_new = []
         for kappa_line in kappa[1:]:
             kappa_new.append(kappa_line-kappa[0])  #Background correction
         kappa_new = np.array(kappa_new)
+
+        kappa_bg_ROI = np.copy(kappa_new[:, :, -2:]) # saving the background ROIs before removing them
+
         kappa_new = kappa_new[:,:,:-2]   #Removes the background ROI values
+
+        kappa_flux_val = np.copy(kappa_new) # to save background subtracted, background ROI removed raw flux values before normalization, to be used for local normalization shape (4, wl, 8)
+
+        kappa_e = np.sqrt(std_kappa[1:]**2 + std_kappa[0]**2)   # for proper kappa error treatment 
+        kappa_e = kappa_e[:, :, :-2]
+
+        kappa_flux_val_e = np.copy(kappa_e) #saving error before global normalization of error, to use for local normalization error propagrtion.
+
         for i, akrow in enumerate(kappa_new):
-            kappa_new[i,:,:] = akrow / (np.sum(akrow) / n_wl)
-        for k, acell in np.ndenumerate(kappa_new):
-            if kappa_new[k] <= kappa_threshold:
-                kappa_new[k] = 0.
+            denom = np.sum(akrow) / n_wl
+            if denom == 0:
+                denom = np.nan
+            kappa_new[i,:,:] = akrow / denom
+            kappa_e[i,:,:] = kappa_e[i,:,:] / denom  #sufficient for a first order estimate (global normalization error)
+
+        # for k, acell in np.ndenumerate(kappa_new):   #removing thresholding og kappa
+        #     if kappa_new[k] <= kappa_threshold:
+        #         kappa_new[k] = 0.
+
         kappa_old = np.copy(kappa)
         kappa = np.copy(kappa_new)
+
+
+        # per wavelength normalization (local normalization instead of global)
+        kappa_lam_denom = np.sum(kappa_flux_val, axis=2, keepdims=True)
+        kappa_lam_denom[kappa_lam_denom == 0] = np.nan
+        kappa_lam = kappa_flux_val / kappa_lam_denom  #per wavelenth normalized kappa
+        kappa_lam_e = kappa_flux_val_e / kappa_lam_denom #local normalization error
+
         print("Transfer matrix")   
     
         A = np.array([[1,-1,0,0],
@@ -684,10 +711,20 @@ class HumInt(object):
 
         if saveto is not None:
             hdulist.append(fits.hdu.ImageHDU(data=kappa.T[:,self.sc_mask,:], name="KAPPA", header=None))
-            hdulist.append(fits.hdu.ImageHDU(data=std_kappa[:,self.sc_mask,:], name="KAPPAE", header=None))
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_e.T[:, self.sc_mask, :], name="KAPPAE", header=None))
+            
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_flux_val.T[:, self.sc_mask, :],name="KAPPA_FLUX_VAL",header=None))
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_bg_ROI.T[:, self.sc_mask, :],name="KAPPA_BG_ROI",header=None))
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_0[self.sc_mask, :].T, name="KAPPA_0",header=None))
+
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_lam.T[:, self.sc_mask, :], name="KAPPA_LAM", header=None))
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_lam_e.T[:, self.sc_mask, :], name="KAPPA_LAM_E", header=None))
+
+            hdulist.append(fits.hdu.ImageHDU(data=kappa_bg_diff[:, self.sc_mask], name="KAPPA_BG_D", header=None))
+
             hdulist.append(fits.hdu.ImageHDU(data=A, name="A", header=None))
             hdulist.append(fits.hdu.ImageHDU(data=all_fringes[:,:,self.sc_mask,:-2], name="FRINGES", header=None))
-            hdulist.append(fits.hdu.ImageHDU(data=all_fringes_std[:,:,self.sc_mask,:-2], name="FRINGESE", header=None))
+            hdulist.append(fits.hdu.ImageHDU(data=all_fringes_std[:,:,self.sc_mask,:-2], name="FRINGESE", header=None)) 
             hdulist.append(fits.hdu.ImageHDU(data=all_fringes[:,:,self.sc_mask,-2:], name="BG", header=None))
             hdulist.append(fits.hdu.ImageHDU(data=all_fringes_std[:,:,self.sc_mask,-2:], name="BGE", header=None))
             # hdulist.append(fits.hdu.ImageHDU(data=PHI_dft, name="PHI", header=None))
