@@ -366,8 +366,6 @@ class HumInt(object):
     
     def get_frames_cal(self, dt, dark=None, sequence=False, return_bg=False):
         if dark is None:
-            if verbose:
-                print("Using the default dark")
             dark = self.dark
         frames = self.get_frames(dt)
         if not sequence:
@@ -575,7 +573,7 @@ class HumInt(object):
                                  (prefix+"co2" , 450),
                                  (prefix+"co2" , 450),
                                  (prefix+"exptime", dt),
-                                 (dateobs, Time.now().isot)])
+                                 ("DATE-OBS", Time.now().isot)])
             hdulist.append(fits.PrimaryHDU(header=myheader))
         test_conditions = {
             "co2_ppm": 1e6,
@@ -703,11 +701,12 @@ class HumInt(object):
             all_pistons.append(pistons)
             relsteps = 2*stepseries
             # phases = 2*np.pi/(self.lambs[None,:]*1e6) * relsteps[:,None]
-        all_fringes = np.array(all_fringes)
-        all_fringes_std = np.array(all_fringes_std)
-        self.move(np.array([0., 0., 0., 0.]))
-        self.shutter_set(np.ones(4).astype(bool))
-        phases = 2*np.pi / (self.sc_lambs[None,:,None]*1.0e6) * all_pistons[:,None,:]
+            all_fringes = np.array(all_fringes)
+            all_fringes_std = np.array(all_fringes_std)
+            all_pistons = np.array(all_pistons)
+            self.move(np.array([0., 0., 0., 0.]))
+            self.shutter_set(np.ones(4).astype(bool))
+            phases = 2*np.pi / (self.sc_lambs[None,None,:,None]*1.0e6) * all_pistons[:,:,None,:]
 
         if saveto is not None:
             hdulist.append(fits.hdu.ImageHDU(data=kappa.T[:,self.sc_mask,:], name="KAPPA", header=None))
