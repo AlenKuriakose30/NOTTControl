@@ -688,7 +688,6 @@ class HumInt(object):
             for apos in mysequence:
                 a, a_std = self.move_and_sample(apos, dt=dt, move_back=False)
                 fringes.append(a)
-                fringes_std.append(a_std)
                 if dt is not None:
                     fringes_std.append(a_std)
                 else:
@@ -701,12 +700,12 @@ class HumInt(object):
             all_pistons.append(pistons)
             relsteps = 2*stepseries
             # phases = 2*np.pi/(self.lambs[None,:]*1e6) * relsteps[:,None]
-            all_fringes = np.array(all_fringes)
-            all_fringes_std = np.array(all_fringes_std)
-            all_pistons = np.array(all_pistons)
-            self.move(np.array([0., 0., 0., 0.]))
-            self.shutter_set(np.ones(4).astype(bool))
-            phases = 2*np.pi / (self.sc_lambs[None,None,:,None]*1.0e6) * all_pistons[:,:,None,:]
+        all_fringes = np.array(all_fringes)
+        all_fringes_std = np.array(all_fringes_std)
+        all_pistons = np.array(all_pistons)
+        self.move(np.array([0., 0., 0., 0.]))
+        self.shutter_set(np.ones(4).astype(bool))
+        phases = 2*np.pi / (self.sc_lambs[None,None,:,None]*1.0e6) * all_pistons[:,:,None,:]
 
         if saveto is not None:
             hdulist.append(fits.hdu.ImageHDU(data=kappa.T[:,self.sc_mask,:], name="KAPPA", header=None))
@@ -726,7 +725,7 @@ class HumInt(object):
             hdulist.append(fits.hdu.ImageHDU(data=all_fringes_std[:,:,self.sc_mask,:-2], name="FRINGESE", header=None)) 
             hdulist.append(fits.hdu.ImageHDU(data=all_fringes[:,:,self.sc_mask,-2:], name="BG", header=None))
             hdulist.append(fits.hdu.ImageHDU(data=all_fringes_std[:,:,self.sc_mask,-2:], name="BGE", header=None))
-            # hdulist.append(fits.hdu.ImageHDU(data=PHI_dft, name="PHI", header=None))
+            # hdulist.append(fits.hdu.ImageHDU(data=PHI_dft, name=  "PHI", header=None))
             hdulist.append(fits.hdu.ImageHDU(data=all_pistons, name="PISTONS", header=None))
             hdulist.append(fits.hdu.ImageHDU(data=self.sc_lambs, name="WAVELENGTHS", header=None))
             hdulist.append(fits.hdu.ImageHDU(data=phases, name="PHASES", header=None))
